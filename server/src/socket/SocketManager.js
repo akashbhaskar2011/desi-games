@@ -12,7 +12,7 @@ export class SocketManager {
           socket.data.playerId = playerId
           socket.join(room.roomCode)
           this.broadcast(room)
-          if (room.gameSession) { room.gameSession.setConnected(playerId, true); this.io.to(room.roomCode).emit('game:state', room.gameSession.publicState()) }
+          if (room.gameSession) { room.gameSession.setConnected(playerId, true); socket.emit('game:state', room.gameSession.publicState()); if (room.gameSession.status === 'terminated') socket.emit('game:terminated', { reason: room.gameSession.terminationReason || 'match_stopped', roomCode: room.roomCode }) }
         } catch (error) { socket.emit('room:error', { code: error.code || 'ROOM_ERROR', message: error.message }) }
       })
       socket.on('game:request-state', ({ roomCode } = {}) => {
@@ -22,6 +22,14 @@ export class SocketManager {
         if (socket.data.roomCode !== normalizedCode || !room.players.some((player) => player.id === socket.data.playerId)) return socket.emit('game:error', { code: 'NOT_MEMBER', message: 'You are not a player in this match.' })
         if (!room.gameSession) return socket.emit('game:error', { code: 'GAME_NOT_STARTED', message: 'Game has not started yet.' })
         socket.emit('game:state', room.gameSession.publicState())
+      })
+      socket.on('game:terminate', async ({ reason = 'match_stopped' } = {}) => {
+        try {
+          const result = this.roomManager.terminate(socket.data.roomCode, socket.data.playerId, reason)
+          if (result.changed && this.roomRepository) { await this.roomRepository.saveRoom(result.room); await this.roomRepository.saveGame(result.room) }
+          if (result.changed) this.io.to(result.room.roomCode).emit('game:terminated', { reason, roomCode: result.room.roomCode })
+          this.logger.info?.('game terminated', { reason })
+        } catch (error) { socket.emit('game:error', { code: error.code || 'ROOM_ERROR', message: error.message }) }
       })
       socket.on('game:move', async ({ from, to } = {}) => {
         const now = Date.now(); const previousMove = this.moveTimes.get(socket) || 0

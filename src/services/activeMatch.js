@@ -1,7 +1,7 @@
 import { apiRequest } from '../lib/api.js'
 
 export const ACTIVE_MATCH_KEY = 'desi_active_match'
-const RECENT_MATCH_TTL = 30 * 60 * 1000
+const NON_RESUMABLE_STATUSES = new Set(['finished', 'completed', 'terminated', 'stopped', 'expired'])
 
 function storage() { return typeof localStorage === 'undefined' ? null : localStorage }
 function notify() { if (typeof window !== 'undefined') window.dispatchEvent(new Event('desi-active-match-change')) }
@@ -17,7 +17,7 @@ export function getActiveMatch() {
   if (!raw) return null
   try {
     const match = JSON.parse(raw)
-    if (match.status === 'finished' && Date.now() - new Date(match.finishedAt || match.lastSeenAt).getTime() > RECENT_MATCH_TTL) { clearActiveMatch(); return null }
+    if (NON_RESUMABLE_STATUSES.has(String(match.status || '').toLowerCase()) || match.roomStatus === 'FINISHED') { clearActiveMatch(); return null }
     return match
   } catch { clearActiveMatch(); return null }
 }
@@ -31,15 +31,21 @@ export function updateActiveMatch(patch) {
 
 export function clearActiveMatch() { storage()?.removeItem(ACTIVE_MATCH_KEY); notify() }
 
+export function clearActiveMatchForRoom(roomCode) {
+  const current = getActiveMatch()
+  if (current?.roomCode === String(roomCode || '').trim().toUpperCase()) clearActiveMatch()
+}
+
 export async function verifyActiveMatch() {
   const current = getActiveMatch()
   if (!current) return null
   try {
     const room = await apiRequest(`/api/rooms/${current.roomCode}`)
+    if (room.status === 'FINISHED') { clearActiveMatchForRoom(current.roomCode); return null }
     const verified = { ...current, gameId: room.gameId, players: room.players, roomStatus: room.status, lastSeenAt: new Date().toISOString() }
     return write(verified)
   } catch (error) {
-    if (error.status === 404) clearActiveMatch()
+    if (error.status === 404) clearActiveMatchForRoom(current.roomCode)
     throw error
   }
 }

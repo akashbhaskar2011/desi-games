@@ -112,6 +112,17 @@ export class RoomManager {
     return room
   }
 
+  terminate(roomCode, playerId, reason = 'match_stopped') {
+    const room = this.require(roomCode)
+    if (!['player_left', 'match_stopped'].includes(reason)) throw new RoomError('Invalid termination reason', 400, 'INVALID_TERMINATION_REASON')
+    if (!room.players.some((player) => player.id === playerId)) throw new RoomError('Player is not a member of this room', 403, 'NOT_MEMBER')
+    if (room.gameSession?.status === 'terminated' || room.status === ROOM_STATUS.FINISHED) return { room, changed: false }
+    room.status = ROOM_STATUS.FINISHED
+    if (room.gameSession) { room.gameSession.status = 'terminated'; room.gameSession.terminationReason = reason; room.gameSession.endReason = reason === 'player_left' ? 'The other player left the game.' : 'The match was stopped.' }
+    room.lastActivity = this.now()
+    return { room, changed: true }
+  }
+
   remove(roomCode) { this.rooms.delete(cleanCode(roomCode)) }
 
   restore(room) {

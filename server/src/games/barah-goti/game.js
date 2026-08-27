@@ -8,7 +8,7 @@ export class BarahGotiGame {
   }
 
   reset() {
-    this.status = 'playing'; this.board = createInitialBoard(); this.turn = this.players[0].id; this.goatsPlaced = 12; this.goatsCaptured = 0; this.winner = null; this.winnerRole = null; this.moveNumber = 0; this.moveHistory = []; this.rematchRequests = new Set()
+    this.status = 'playing'; this.terminationReason = null; this.board = createInitialBoard(); this.turn = this.players[0].id; this.goatsPlaced = 12; this.goatsCaptured = 0; this.winner = null; this.winnerRole = null; this.moveNumber = 0; this.moveHistory = []; this.rematchRequests = new Set()
   }
 
   player(playerId) { return this.players.find((player) => player.id === playerId) }
@@ -19,7 +19,7 @@ export class BarahGotiGame {
   }
 
   restore(state) {
-    this.status = state.status; this.board = state.board; this.turn = state.turn; this.goatsPlaced = state.goatsPlaced; this.goatsCaptured = state.goatsCaptured; this.winner = state.winner; this.winnerRole = state.winnerRole; this.endReason = state.endReason; this.moveNumber = state.moveNumber; this.moveHistory = state.moveHistory || []; this.rematchRequests = new Set(state.rematchRequests || [])
+    this.status = state.status; this.terminationReason = state.terminationReason || null; this.board = state.board; this.turn = state.turn; this.goatsPlaced = state.goatsPlaced; this.goatsCaptured = state.goatsCaptured; this.winner = state.winner; this.winnerRole = state.winnerRole; this.endReason = state.endReason; this.moveNumber = state.moveNumber; this.moveHistory = state.moveHistory || []; this.rematchRequests = new Set(state.rematchRequests || [])
     return this
   }
 
@@ -49,6 +49,6 @@ export class BarahGotiGame {
   }
 
   publicState() {
-    return { gameId: 'barah-goti', status: this.status, players: this.players, board: this.board, turn: this.turn, goatsPlaced: this.goatsPlaced, goatsCaptured: this.goatsCaptured, winner: this.winner, winnerRole: this.winnerRole, endReason: this.endReason || null, moveNumber: this.moveNumber, rematchRequests: [...this.rematchRequests] }
+    return { gameId: 'barah-goti', status: this.status, terminationReason: this.terminationReason, players: this.players, board: this.board, turn: this.turn, goatsPlaced: this.goatsPlaced, goatsCaptured: this.goatsCaptured, winner: this.winner, winnerRole: this.winnerRole, endReason: this.endReason || null, moveNumber: this.moveNumber, rematchRequests: [...this.rematchRequests] }
   }
 }

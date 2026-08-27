@@ -27,3 +27,11 @@ test('repository uses cleanup query', async () => {
   await new RoomRepository(database).cleanupExpired()
   assert.match(database.calls.at(-1).sql, /DELETE FROM rooms/)
 })
+
+test('repository only restores resumable rooms and sessions', async () => {
+  const database = fakeDatabase()
+  await new RoomRepository(database).loadActiveRooms()
+  const sql = database.calls.at(-1).sql
+  assert.match(sql, /r\.status IN \('WAITING', 'PLAYING'\)/)
+  assert.match(sql, /gs\.status IS NULL OR gs\.status = 'active'/)
+})

@@ -46,6 +46,10 @@ app.post('/api/rooms/:roomCode/start', mutationLimit, async (request, response) 
   try { const room = roomManager.start(request.params.roomCode, request.body?.playerId); if (roomRepository) { await roomRepository.saveRoom(room); await roomRepository.saveGame(room) } response.json({ roomCode: room.roomCode, status: room.status }); io.to(room.roomCode).emit('game:started', { roomCode: room.roomCode, gameId: room.gameId }); logger.info('game started', { gameId: room.gameId }) }
   catch (error) { sendError(response, error) }
 })
+app.post('/api/rooms/:roomCode/terminate', mutationLimit, async (request, response) => {
+  try { const reason = request.body?.reason || 'match_stopped'; const result = roomManager.terminate(request.params.roomCode, request.body?.playerId, reason); if (result.changed && roomRepository) { await roomRepository.saveRoom(result.room); await roomRepository.saveGame(result.room) } if (result.changed) io.to(result.room.roomCode).emit('game:terminated', { reason, roomCode: result.room.roomCode }); response.json({ roomCode: result.room.roomCode, status: result.room.status }) }
+  catch (error) { sendError(response, error) }
+})
 
 app.use((error, _request, response, _next) => {
   logger.error('request failed', { message: error.message })

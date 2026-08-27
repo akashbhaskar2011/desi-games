@@ -8,5 +8,5 @@ export function ActiveMatchBanner() {
   const { match } = useActiveMatch(); const location = useLocation()
   if (!match || location.pathname.startsWith('/play/')) return null
   const game = getGame(match.gameId); const recent = match.status === 'finished'
-  return <aside className="active-match-banner"><div className="active-match-icon"><Gamepad2 size={20} /></div><div><span>{recent ? 'Recent match' : 'Active match'}</span><strong>{game?.name || match.gameId} · {match.roomCode}</strong></div><div className="active-match-actions"><Link to={`/play/${match.roomCode}`} className="button button-primary">{recent ? 'View result' : 'Continue match'} <ArrowRight size={15} /></Link><StopMatchControl /></div></aside>
+  return <aside className="active-match-banner"><div className="active-match-icon"><Gamepad2 size={20} /></div><div><span>{recent ? 'Recent match' : 'Active match'}</span><strong>{game?.name || match.gameId} · {match.roomCode}</strong></div><div className="active-match-actions"><Link to={`/play/${match.roomCode}`} className="button button-primary">{recent ? 'View result' : 'Continue match'} <ArrowRight size={15} /></Link><StopMatchControl roomCode={match.roomCode} playerId={match.playerId} /></div></aside>
 }
