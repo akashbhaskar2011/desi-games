@@ -1,0 +1,39 @@
+{
+  "name": "desi-games",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "migration:create": "node server/src/db/migrate.js create",
+    "migration:run": "node server/src/db/migrate.js up",
+    "migration:rollback": "node server/src/db/migrate.js down",
+    "test": "npm run test:server && node --test src/services/activeMatch.test.js",
+    "preview": "vite preview",
+    "server": "node server/src/index.js",
+    "server:dev": "node --watch server/src/index.js",
+    "test:server": "node --test server/src/rooms/RoomManager.test.js server/src/games/barah-goti/rules.test.js server/src/socket/SocketManager.test.js server/src/db/repositories/RoomRepository.test.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "express-rate-limit": "latest",
+    "framer-motion": "latest",
+    "helmet": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "latest",
+    "pg": "latest",
+    "socket.io-client": "latest",
+    "socket.io": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "latest",
+    "tailwindcss": "latest"
+  }
+}
