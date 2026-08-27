@@ -20,6 +20,7 @@ test('repository maps persisted room rows to public room data', async () => {
   assert.equal(room.roomCode, 'ABC123')
   assert.equal(room.players.length, 2)
   assert.equal(room.players[1].connected, false)
+  assert.match(database.calls[0].sql, /gs\.status IS NULL OR gs\.status = 'playing'/)
 })
 
 test('repository uses cleanup query', async () => {
@@ -33,5 +34,5 @@ test('repository only restores resumable rooms and sessions', async () => {
   await new RoomRepository(database).loadActiveRooms()
   const sql = database.calls.at(-1).sql
   assert.match(sql, /r\.status IN \('WAITING', 'PLAYING'\)/)
-  assert.match(sql, /gs\.status IS NULL OR gs\.status = 'active'/)
+  assert.match(sql, /gs\.status IS NULL OR gs\.status = 'playing'/)
 })

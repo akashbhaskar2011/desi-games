@@ -123,6 +123,14 @@ export class RoomManager {
     return { room, changed: true }
   }
 
+  finish(roomCode) {
+    const room = this.require(roomCode)
+    if (room.gameSession?.status !== 'finished') throw new RoomError('This game has not finished', 409, 'GAME_NOT_FINISHED')
+    room.status = ROOM_STATUS.FINISHED
+    room.lastActivity = this.now()
+    return room
+  }
+
   remove(roomCode) { this.rooms.delete(cleanCode(roomCode)) }
 
   restore(room) {

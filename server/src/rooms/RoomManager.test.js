@@ -30,3 +30,14 @@ test('terminates once, preserves the reason, and rejects later moves', () => {
   const second = manager.terminate(room.roomCode, host.playerId, 'match_stopped')
   assert.equal(first.changed, true); assert.equal(second.changed, false); assert.equal(room.status, 'FINISHED'); assert.equal(room.gameSession.status, 'terminated'); assert.equal(room.gameSession.terminationReason, 'player_left'); assert.match(room.gameSession.move(host.playerId, 12, 13).error, /ended/)
 })
+
+test('finished games can be removed from the active room manager', () => {
+  const manager = new RoomManager({ codeGenerator: () => 'A7K92P' })
+  const host = player('1'); const guest = player('2'); const room = manager.create({ gameId: 'barah-goti', ...host })
+  manager.join(room.roomCode, guest); manager.start(room.roomCode, host.playerId)
+  room.gameSession.status = 'finished'
+  manager.finish(room.roomCode)
+  assert.equal(room.status, 'FINISHED')
+  manager.remove(room.roomCode)
+  assert.equal(manager.find(room.roomCode), undefined)
+})

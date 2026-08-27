@@ -26,8 +26,8 @@ export class SocketManager {
       socket.on('game:terminate', async ({ reason = 'match_stopped' } = {}) => {
         try {
           const result = this.roomManager.terminate(socket.data.roomCode, socket.data.playerId, reason)
-          if (result.changed && this.roomRepository) { await this.roomRepository.saveRoom(result.room); await this.roomRepository.saveGame(result.room) }
-          if (result.changed) this.io.to(result.room.roomCode).emit('game:terminated', { reason, roomCode: result.room.roomCode })
+          if (result.changed && this.roomRepository) await this.roomRepository.finalizeRoom(result.room)
+          if (result.changed) { this.roomManager.remove(result.room.roomCode); this.io.to(result.room.roomCode).emit('game:terminated', { reason, roomCode: result.room.roomCode }) }
           this.logger.info?.('game terminated', { reason })
         } catch (error) { socket.emit('game:error', { code: error.code || 'ROOM_ERROR', message: error.message }) }
       })
@@ -40,8 +40,10 @@ export class SocketManager {
         const result = room.gameSession.move(socket.data.playerId, from, to)
         if (result.error) return socket.emit('game:error', { message: result.error })
         room.lastActivity = Date.now()
-        try { if (this.roomRepository) { await this.roomRepository.saveRoom(room); await this.roomRepository.saveGame(room) } }
+        if (result.state.status === 'finished') this.roomManager.finish(room.roomCode)
+        try { if (this.roomRepository) { if (result.state.status === 'finished') await this.roomRepository.finalizeRoom(room); else { await this.roomRepository.saveRoom(room); await this.roomRepository.saveGame(room) } } }
         catch { return socket.emit('game:error', { message: 'Your move could not be saved. Please try again.' }) }
+        if (result.state.status === 'finished') this.roomManager.remove(room.roomCode)
         this.io.to(room.roomCode).emit('game:state', result.state)
         this.logger.info?.('move accepted', { gameId: room.gameId, moveNumber: result.state.moveNumber })
         if (result.state.status === 'finished') this.io.to(room.roomCode).emit('game:ended', { winner: result.state.winner, winnerRole: result.state.winnerRole, reason: result.state.endReason, moveNumber: result.state.moveNumber, goatsCaptured: result.state.goatsCaptured })

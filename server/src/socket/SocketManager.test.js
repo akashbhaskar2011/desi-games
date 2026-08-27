@@ -41,5 +41,5 @@ test('game:terminate broadcasts the player-left reason once', async () => {
   const emitted = []; const terminationSocket = fakeSocket(); const io = { on: (_event, handler) => { handler(terminationSocket) }, to: () => ({ emit: (event, payload) => emitted.push({ event, payload }) }) }
   new SocketManager(io, manager).attach(); terminationSocket.data.roomCode = room.roomCode; terminationSocket.data.playerId = room.hostId
   terminationSocket.trigger('game:terminate', { reason: 'player_left' }); await new Promise((resolve) => setTimeout(resolve, 0))
-  assert.equal(emitted.filter((event) => event.event === 'game:terminated').length, 1); assert.equal(emitted[0].payload.reason, 'player_left')
+  assert.equal(emitted.filter((event) => event.event === 'game:terminated').length, 1); assert.equal(emitted[0].payload.reason, 'player_left'); assert.equal(manager.find(room.roomCode), undefined)
 })

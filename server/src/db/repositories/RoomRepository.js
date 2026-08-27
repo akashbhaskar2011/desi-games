@@ -44,15 +44,32 @@ export class RoomRepository {
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   }
 
+  // Final room/session state is persisted together before the runtime room is removed.
+  // Historical room, game-session, and move rows remain available for reporting.
+  async finalizeRoom(room) {
+    if (!room.gameSession) return this.saveRoom(room)
+    const client = await this.database.connect()
+    try {
+      await client.query('BEGIN')
+      const roomResult = await client.query(`UPDATE rooms SET status = $2, updated_at = now() WHERE room_code = $1 RETURNING id`, [room.roomCode, room.status])
+      if (!roomResult.rowCount) throw new Error('Room not found while finalizing')
+      const game = room.gameSession.publicState()
+      const winner = game.winner ? await client.query('SELECT id FROM players WHERE anonymous_id = $1', [game.winner]) : { rows: [{ id: null }] }
+      const session = await client.query(`INSERT INTO game_sessions (room_id, game_id, state, status, winner_player_id, finished_at) VALUES ($1, $2, $3, $4, $5, now()) ON CONFLICT (room_id) DO UPDATE SET state = EXCLUDED.state, status = EXCLUDED.status, winner_player_id = EXCLUDED.winner_player_id, updated_at = now(), finished_at = EXCLUDED.finished_at RETURNING id`, [roomResult.rows[0].id, game.gameId, game, game.status, winner.rows[0].id])
+      for (const move of room.gameSession.moveHistory) await client.query(`INSERT INTO game_moves (game_session_id, move_number, player_id, from_position, to_position, captured_position, created_at) VALUES ($1, $2, (SELECT id FROM players WHERE anonymous_id = $3), $4, $5, $6, $7) ON CONFLICT DO NOTHING`, [session.rows[0].id, move.moveNumber, move.playerId, move.from, move.to, move.capture, move.timestamp])
+      await client.query('COMMIT')
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+
   async findRoom(roomCode) {
-    const result = await this.database.query(`SELECT r.room_code AS "roomCode", r.game_id AS "gameId", r.status, r.host_player_id, r.expires_at, p.anonymous_id AS "playerId", p.display_name AS name, rp.connected, rp.joined_at AS "joinedAt" FROM rooms r JOIN room_players rp ON rp.room_id = r.id JOIN players p ON p.id = rp.player_id WHERE r.room_code = $1 AND r.expires_at > now() AND r.status IN ('WAITING', 'PLAYING')`, [roomCode])
+    const result = await this.database.query(`SELECT r.room_code AS "roomCode", r.game_id AS "gameId", r.status, r.host_player_id, r.expires_at, p.anonymous_id AS "playerId", p.display_name AS name, rp.connected, rp.joined_at AS "joinedAt" FROM rooms r JOIN room_players rp ON rp.room_id = r.id JOIN players p ON p.id = rp.player_id LEFT JOIN game_sessions gs ON gs.room_id = r.id WHERE r.room_code = $1 AND r.expires_at > now() AND r.status IN ('WAITING', 'PLAYING') AND (gs.status IS NULL OR gs.status = 'playing')`, [roomCode])
     if (!result.rowCount) return null
     const first = result.rows[0]
     return { roomCode: first.roomCode, gameId: first.gameId, hostId: first.host_player_id, status: first.status, players: result.rows.map(({ playerId, name, connected, joinedAt }) => ({ id: playerId, name, connected, joinedAt })) }
   }
 
   async loadActiveRooms() {
-    const result = await this.database.query(`SELECT r.id AS "roomId", r.room_code AS "roomCode", r.game_id AS "gameId", host.anonymous_id AS "hostPlayerId", r.status, r.created_at AS "createdAt", r.updated_at AS "updatedAt", p.anonymous_id AS "playerId", p.display_name AS name, rp.role, rp.connected, rp.joined_at AS "joinedAt", gs.state AS "gameState" FROM rooms r JOIN players host ON host.id = r.host_player_id JOIN room_players rp ON rp.room_id = r.id JOIN players p ON p.id = rp.player_id LEFT JOIN game_sessions gs ON gs.room_id = r.id WHERE r.expires_at > now() AND r.status IN ('WAITING', 'PLAYING') AND (gs.status IS NULL OR gs.status = 'active')`)
+    const result = await this.database.query(`SELECT r.id AS "roomId", r.room_code AS "roomCode", r.game_id AS "gameId", host.anonymous_id AS "hostPlayerId", r.status, r.created_at AS "createdAt", r.updated_at AS "updatedAt", p.anonymous_id AS "playerId", p.display_name AS name, rp.role, rp.connected, rp.joined_at AS "joinedAt", gs.state AS "gameState" FROM rooms r JOIN players host ON host.id = r.host_player_id JOIN room_players rp ON rp.room_id = r.id JOIN players p ON p.id = rp.player_id LEFT JOIN game_sessions gs ON gs.room_id = r.id WHERE r.expires_at > now() AND r.status IN ('WAITING', 'PLAYING') AND (gs.status IS NULL OR gs.status = 'playing')`)
     const rooms = new Map()
     for (const row of result.rows) {
       if (!rooms.has(row.roomCode)) rooms.set(row.roomCode, { roomCode: row.roomCode, gameId: row.gameId, hostId: row.hostPlayerId, status: row.status, players: [], createdAt: new Date(row.createdAt).getTime(), lastActivity: new Date(row.updatedAt).getTime(), gameState: row.gameState })
