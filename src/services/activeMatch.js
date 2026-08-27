@@ -36,6 +36,11 @@ export function clearActiveMatchForRoom(roomCode) {
   if (current?.roomCode === String(roomCode || '').trim().toUpperCase()) clearActiveMatch()
 }
 
+export function isViewingMatch(pathname, roomCode) {
+  const match = String(pathname || '').match(/^\/(?:room|play)\/([^/]+)\/?$/)
+  return Boolean(match && String(match[1]).toUpperCase() === String(roomCode || '').toUpperCase())
+}
+
 export async function verifyActiveMatch() {
   const current = getActiveMatch()
   if (!current) return null

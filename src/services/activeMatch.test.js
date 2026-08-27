@@ -1,6 +1,6 @@
 import test, { beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { ACTIVE_MATCH_KEY, clearActiveMatch, clearActiveMatchForRoom, getActiveMatch, saveActiveMatch, updateActiveMatch, verifyActiveMatch } from './activeMatch.js'
+import { ACTIVE_MATCH_KEY, clearActiveMatch, clearActiveMatchForRoom, getActiveMatch, isViewingMatch, saveActiveMatch, updateActiveMatch, verifyActiveMatch } from './activeMatch.js'
 
 const store = new Map()
 global.localStorage = { getItem: (key) => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) }
@@ -36,4 +36,11 @@ test('termination cleanup cannot remove a newer room reference', () => {
   assert.equal(getActiveMatch().roomCode, 'NEW123')
   clearActiveMatchForRoom('NEW123')
   assert.equal(getActiveMatch(), null)
+})
+
+test('recognizes only the active room and game routes as the current match context', () => {
+  assert.equal(isViewingMatch('/room/ABC123', 'abc123'), true)
+  assert.equal(isViewingMatch('/play/ABC123', 'ABC123'), true)
+  assert.equal(isViewingMatch('/play/OTHER1', 'ABC123'), false)
+  assert.equal(isViewingMatch('/games', 'ABC123'), false)
 })
