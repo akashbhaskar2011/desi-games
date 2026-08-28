@@ -1,5 +1,12 @@
+import crypto from 'node:crypto'
+
+const CHAT_MESSAGE_LIMIT = 200
+const CHAT_PAYLOAD_LIMIT = 4 * 1024
+const CHAT_RATE_LIMIT = 5
+const CHAT_RATE_WINDOW_MS = 10 * 1000
+
 export class SocketManager {
-  constructor(io, roomManager, roomRepository = null, logger = console) { this.io = io; this.roomManager = roomManager; this.roomRepository = roomRepository; this.logger = logger; this.moveTimes = new WeakMap() }
+  constructor(io, roomManager, roomRepository = null, logger = console) { this.io = io; this.roomManager = roomManager; this.roomRepository = roomRepository; this.logger = logger; this.moveTimes = new WeakMap(); this.chatTimes = new WeakMap() }
 
   broadcast(room) { this.io.to(room.roomCode).emit('room:update', this.roomManager.toPublic(room)) }
 
@@ -22,6 +29,26 @@ export class SocketManager {
         if (socket.data.roomCode !== normalizedCode || !room.players.some((player) => player.id === socket.data.playerId)) return socket.emit('game:error', { code: 'NOT_MEMBER', message: 'You are not a player in this match.' })
         if (!room.gameSession) return socket.emit('game:error', { code: 'GAME_NOT_STARTED', message: 'Game has not started yet.' })
         socket.emit('game:state', room.gameSession.publicState())
+      })
+      socket.on('chat:send', (payload = {}) => {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) || JSON.stringify(payload).length > CHAT_PAYLOAD_LIMIT) return socket.emit('chat:error', { message: 'That message is too large.' })
+        if (typeof payload.message !== 'string') return socket.emit('chat:error', { message: 'Message must be text.' })
+        const message = payload.message.trim()
+        if (!message) return socket.emit('chat:error', { message: 'Message cannot be empty.' })
+        if (message.length > CHAT_MESSAGE_LIMIT) return socket.emit('chat:error', { message: `Messages can be up to ${CHAT_MESSAGE_LIMIT} characters.` })
+
+        const room = this.roomManager.find(socket.data.roomCode)
+        const player = room?.players.find((candidate) => candidate.id === socket.data.playerId)
+        const activeGame = room?.status === 'PLAYING' && room.gameSession && !['finished', 'terminated'].includes(room.gameSession.status)
+        if (!room || !player || !activeGame) return socket.emit('chat:error', { message: 'Chat is no longer available for this match.' })
+
+        const now = Date.now()
+        const recent = (this.chatTimes.get(socket) || []).filter((time) => now - time < CHAT_RATE_WINDOW_MS)
+        if (recent.length >= CHAT_RATE_LIMIT) return socket.emit('chat:error', { message: "You're sending messages too quickly." })
+        recent.push(now)
+        this.chatTimes.set(socket, recent)
+        room.lastActivity = now
+        this.io.to(room.roomCode).emit('chat:message', { id: crypto.randomUUID(), roomCode: room.roomCode, playerId: player.id, playerName: player.name, message, timestamp: now })
       })
       socket.on('game:terminate', async ({ reason = 'match_stopped' } = {}) => {
         try {

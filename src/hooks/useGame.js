@@ -5,9 +5,9 @@ import { getAnonymousPlayerId } from '../lib/identity'
 import { clearActiveMatchForRoom, getActiveMatch, updateActiveMatch } from '../services/activeMatch'
 
 export function useGame(roomCode) {
-  const [state, setState] = useState(null); const [connection, setConnection] = useState('connecting'); const [error, setError] = useState(''); const [retryKey, setRetryKey] = useState(0); const playerId = getAnonymousPlayerId(); const socketRef = useRef(null)
+  const [state, setState] = useState(null); const [connection, setConnection] = useState('connecting'); const [error, setError] = useState(''); const [chatMessages, setChatMessages] = useState([]); const [chatError, setChatError] = useState(''); const [retryKey, setRetryKey] = useState(0); const playerId = getAnonymousPlayerId(); const socketRef = useRef(null)
   useEffect(() => {
-    setState(null); setError(''); setConnection('connecting')
+    setState(null); setError(''); setChatMessages([]); setChatError(''); setConnection('connecting')
     const socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: true })
     socketRef.current = socket
     const updateCurrentRoom = (patch) => { if (getActiveMatch()?.roomCode === roomCode) updateActiveMatch(patch) }
@@ -18,9 +18,12 @@ export function useGame(roomCode) {
     socket.on('game:terminated', ({ reason }) => { setState((current) => current ? { ...current, status: 'terminated', terminationReason: reason } : current); clearActiveMatchForRoom(roomCode) })
     socket.on('room:error', (payload) => { if (payload.code === 'ROOM_NOT_FOUND') clearActiveMatchForRoom(roomCode); setError(payload.message || 'This match is no longer available.') })
     socket.on('game:error', (payload) => { if (payload.code === 'ROOM_NOT_FOUND') clearActiveMatchForRoom(roomCode); setError(payload.message || 'Unable to recover this match.') })
+    socket.on('chat:message', (message) => setChatMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]))
+    socket.on('chat:error', (payload) => setChatError(payload.message || 'Unable to send that message.'))
     return () => { socket.disconnect(); socketRef.current = null }
   }, [roomCode, playerId, retryKey])
   function move(from, to) { socketRef.current?.emit('game:move', { from, to }) }
   function rematch() { socketRef.current?.emit('game:rematch-request') }
-  return { state, connection, error, playerId, move, rematch, retry: () => setRetryKey((key) => key + 1), clearError: () => setError('') }
+  function sendChat(message) { setChatError(''); socketRef.current?.emit('chat:send', { message }) }
+  return { state, connection, error, playerId, move, rematch, chatMessages, chatError, sendChat, retry: () => setRetryKey((key) => key + 1), clearError: () => setError(''), clearChatError: () => setChatError('') }
 }
