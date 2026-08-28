@@ -1,3 +1,3 @@
-export function Badge({ children, tone = 'default' }) {
-  return <span className={`badge badge-${tone}`}>{children}</span>
+export function Badge({ children, tone = "default" }) {
+  return <span className={`badge badge-${tone}`}>{children}</span>;
 }

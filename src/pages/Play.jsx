@@ -1,3 +1,5 @@
-import { Game } from '../games/barah-goti/Game'
+import { Game } from "../games/barah-goti/Game";
 
-export function Play() { return <Game /> }
+export function Play() {
+  return <Game />;
+}
