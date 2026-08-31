@@ -265,7 +265,8 @@ export function Game() {
           <RoomChat
             messages={chatMessages}
             playerId={playerId}
-            disabled={finished || terminated || connection !== "connected"}
+            // disabled={finished || terminated || connection !== "connected"}
+            disabled={finished || terminated || connection !== "connected" || !opponent}
             error={chatError}
             onSend={sendChat}
           />
